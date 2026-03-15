@@ -1,0 +1,59 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap");
+
+:root
+{
+  --bg-1: #f7f4ea;
+  --bg-2: #f0e7ce;
+  --surface: #fffaf0;
+  --surface-2: #f5ecda;
+  --ink: #1f1e18;
+  --muted: #6a6356;
+  --accent: #0d6e6e;
+  --accent-2: #d56f24;
+  --danger: #b62633;
+  --ok: #1e7a39;
+  --border: #d6cdb8;
+  --shadow: 0 18px 40px rgba(45, 37, 19, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+html,
+body
+{
+  margin: 0;
+  min-height: 100%;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 500px at 10% -10%, rgba(13, 110, 110, 0.18), transparent 60%),
+    radial-gradient(850px 500px at 95% -10%, rgba(213, 111, 36, 0.2), transparent 55%),
+    linear-gradient(170deg, var(--bg-1), var(--bg-2));
+}
+
+body
+{
+  animation: fade-in 420ms ease-out;
+}
+
+@keyframes fade-in
+{
+  from
+  {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to
+  {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+button,
+input,
+select
+{
+  font: inherit;
+}
