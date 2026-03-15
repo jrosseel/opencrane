@@ -18,18 +18,18 @@ Multi-tenant [OpenClaw](https://github.com/openclaw/openclaw) platform on Kubern
 │                            │   │     OpenClaw     │   │     OpenClaw     │   │                            │
 │ - repo reconcile           │   │    (isolated)    │   │    (isolated)    │   │ - outbound policy          │
 │ - skill deployment         │   ├────────┬─────────┤   ├────────┬─────────┤   │ - proxy / allowlists       │
-│ - config push              │   │   GCS  │         │   │   GCS  │         │   │ - secrets brokerage        │
-│ - bootstrap sync           │   │ bucket │         │   │ bucket │         │   │ - audit / rate limiting    │
-│ - rollout coordination     │   │ IAM    │         │   │ IAM    │         │   │ - external access control  │
+│ - config push              │   │   GCS  │ IAM     |   │   GCS  │ IAM     │ - secrets brokerage        │
+│ - bootstrap sync           │   │ bucket │+ Secret │   │ bucket │+ Secret │   │ - audit / rate limiting    │
+│ - rollout coordination     │   │        │ Vault   │   │ IAM    │ Vault   │   │ - external access control  │
 │                            │   └──────────────────┘   └──────────────────┘   │                            │
 │                            │   ┌──────────────────┐                          │                            │
 │                            │   │     sara.oc      │                          │                            │
 │                            │   │     OpenClaw     │                          │                            │
 │                            │   │    (isolated)    │                          │                            │
 │                            │   ├────────┬─────────┤                          │                            │
-│                            │   │   GCS  │         │                          │                            │
-│                            │   │ bucket │         │                          │                            │
-│                            │   │ IAM    │         │                          │                            │
+│                            │   │   GCS  │ IAM     │                          │                            │
+│                            │   │ bucket │+ Secret │                          │                            │
+│                            │   │        │ Vault   │                          │                            │
 └────────────────────────────┘   └──────────────────┘                          └────────────────────────────┘
 ```
 
