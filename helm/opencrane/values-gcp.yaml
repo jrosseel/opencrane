@@ -1,0 +1,35 @@
+# GCP-specific value overrides for OpenCrane on GKE
+
+tenant:
+  storage:
+    provider: gcs
+    bucketPrefix: opencrane
+    csiDriver: gcsfuse.csi.storage.gke.io
+    gcpProject: ""  # Set per environment
+
+sharedSkills:
+  pvc:
+    storageClass: standard-rwx
+
+ingress:
+  className: gce
+  annotations:
+    kubernetes.io/ingress.class: gce
+    networking.gke.io/managed-certificates: opencrane-cert
+
+controlPlane:
+  database:
+    existingSecret: opencrane-cloudsql
+    secretKey: DATABASE_URL
+
+crossplane:
+  enabled: true
+  provider: gcp
+
+externalSecrets:
+  enabled: true
+  provider: gcp-secret-manager
+
+observability:
+  cloudLogging: true
+  cloudErrorReporting: true
