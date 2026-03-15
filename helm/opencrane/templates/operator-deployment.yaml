@@ -31,5 +31,15 @@ spec:
               value: {{ .Values.ingress.domain | quote }}
             - name: INGRESS_CLASS_NAME
               value: {{ .Values.ingress.className | quote }}
+            - name: STORAGE_PROVIDER
+              value: {{ .Values.tenant.storage.provider | quote }}
+            - name: BUCKET_PREFIX
+              value: {{ .Values.tenant.storage.bucketPrefix | quote }}
+            - name: GCP_PROJECT
+              value: {{ .Values.tenant.storage.gcpProject | quote }}
+            - name: CSI_DRIVER
+              value: {{ .Values.tenant.storage.csiDriver | quote }}
+            - name: CROSSPLANE_ENABLED
+              value: {{ .Values.crossplane.enabled | quote }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}

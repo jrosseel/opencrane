@@ -2,12 +2,33 @@
 set -euo pipefail
 
 STATE_DIR="${OPENCLAW_STATE_DIR:-/data/openclaw}"
+RUNTIME_DIR="$STATE_DIR/runtime"
+SECRETS_DIR="${OPENCLAW_SECRETS_DIR:-/data/secrets}"
 SHARED_SKILLS="/shared-skills"
 CONFIG_SOURCE="/config/openclaw.json"
 SKILLS_DIR="$STATE_DIR/agents/main/skills"
+OPENCLAW_VERSION="${OPENCLAW_VERSION:-latest}"
 
-# Ensure state directory structure exists
-mkdir -p "$STATE_DIR/agents/main/agent" "$SKILLS_DIR"
+# Ensure GCS-backed directory structure
+mkdir -p "$STATE_DIR/agents/main/agent" "$SKILLS_DIR" \
+         "$STATE_DIR/sessions" "$STATE_DIR/uploads" "$STATE_DIR/knowledge" \
+         "$RUNTIME_DIR"
+
+# Ensure pod-local secrets dir (emptyDir, Memory-backed)
+mkdir -p "$SECRETS_DIR"
+
+# Install or verify OpenClaw runtime on persistent storage
+OPENCLAW_BIN="$RUNTIME_DIR/node_modules/.bin/openclaw"
+if [ ! -x "$OPENCLAW_BIN" ]; then
+  echo "[opencrane] Installing OpenClaw@${OPENCLAW_VERSION} to persistent storage..."
+  npm install --prefix "$RUNTIME_DIR" "openclaw@${OPENCLAW_VERSION}" --omit=dev
+  echo "[opencrane] OpenClaw installed successfully"
+else
+  echo "[opencrane] OpenClaw runtime found at $OPENCLAW_BIN"
+fi
+
+# Add runtime bin to PATH
+export PATH="$RUNTIME_DIR/node_modules/.bin:$PATH"
 
 # Copy base config if not already present (preserves tenant customizations)
 if [ ! -f "$STATE_DIR/openclaw.json" ] && [ -f "$CONFIG_SOURCE" ]; then
@@ -40,4 +61,4 @@ if [ -n "${OPENCRANE_TEAM:-}" ] && [ -d "$SHARED_SKILLS/teams/$OPENCRANE_TEAM" ]
 fi
 
 echo "[opencrane] Starting OpenClaw gateway"
-exec "$@"
+exec openclaw gateway run --bind lan --port "${OPENCLAW_GATEWAY_PORT:-18789}"

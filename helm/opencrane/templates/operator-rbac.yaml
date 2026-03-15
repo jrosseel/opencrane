@@ -21,14 +21,26 @@ rules:
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "persistentvolumeclaims", "configmaps"]
+    resources: ["services", "configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ServiceAccounts for Workload Identity
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  # Secrets for encryption keys
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses", "networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Cilium policies (optional, if Cilium is installed)
   - apiGroups: ["cilium.io"]
     resources: ["ciliumnetworkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Crossplane bucket claims (optional, if Crossplane is installed)
+  - apiGroups: ["storage.opencrane.io"]
+    resources: ["bucketclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Events for audit trail
   - apiGroups: [""]

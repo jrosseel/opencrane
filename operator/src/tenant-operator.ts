@@ -1,8 +1,11 @@
+import { randomBytes } from "node:crypto";
+
 import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
 import type { OperatorConfig, Tenant } from "./types.js";
 import { applyResource, deleteResource } from "./reconciler.js";
+import { buildBucketClaim } from "./storage-provider.js";
 
 /** Kubernetes API group for OpenCrane CRDs. */
 const API_GROUP = "opencrane.io";
@@ -15,7 +18,8 @@ const PLURAL = "tenants";
 
 /**
  * Watches Tenant custom resources and reconciles the corresponding
- * Kubernetes workloads (Deployment, Service, Ingress, ConfigMap, PVC).
+ * Kubernetes workloads (Deployment, Service, Ingress, ConfigMap,
+ * ServiceAccount, BucketClaim, encryption key Secret).
  */
 export class TenantOperator
 {
@@ -24,6 +28,9 @@ export class TenantOperator
 
   /** Client for generic Kubernetes object CRUD via server-side apply. */
   private objectApi: k8s.KubernetesObjectApi;
+
+  /** Client for core Kubernetes API operations (Secrets). */
+  private coreApi: k8s.CoreV1Api;
 
   /** Watch client for streaming Tenant CR events. */
   private watch: k8s.Watch;
@@ -41,6 +48,7 @@ export class TenantOperator
   {
     this.customApi = kc.makeApiClient(k8s.CustomObjectsApi);
     this.objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
+    this.coreApi = kc.makeApiClient(k8s.CoreV1Api);
     this.watch = new k8s.Watch(kc);
     this.config = config;
     this.log = log.child({ component: "tenant-operator" });
@@ -60,7 +68,8 @@ export class TenantOperator
     this.log.info({ path }, "starting tenant watch");
 
     const watchLoop = async () => {
-      try {
+      try
+      {
         await this.watch.watch(
           path,
           {},
@@ -70,13 +79,16 @@ export class TenantOperator
             });
           },
           (err) => {
-            if (err) {
+            if (err)
+            {
               this.log.error({ err }, "watch connection lost, reconnecting...");
             }
             setTimeout(watchLoop, 5000);
           },
         );
-      } catch (err) {
+      }
+      catch (err)
+      {
         this.log.error({ err }, "watch failed, retrying...");
         setTimeout(watchLoop, 5000);
       }
@@ -95,12 +107,16 @@ export class TenantOperator
 
     this.log.info({ type, name }, "tenant event");
 
-    switch (type) {
+    switch (type)
+    {
       case "ADDED":
       case "MODIFIED":
-        if (tenant.spec.suspended) {
+        if (tenant.spec.suspended)
+        {
           await this.suspendTenant(tenant);
-        } else {
+        }
+        else
+        {
           await this.reconcileTenant(tenant);
         }
         break;
@@ -111,8 +127,9 @@ export class TenantOperator
   }
 
   /**
-   * Reconcile all child resources for a running tenant: PVC, ConfigMap,
-   * Deployment, Service, Ingress, and update the Tenant status.
+   * Reconcile all child resources for a running tenant: ServiceAccount,
+   * BucketClaim (if cloud storage enabled), encryption key Secret,
+   * ConfigMap, Deployment, Service, Ingress, and update the Tenant status.
    */
   async reconcileTenant(tenant: Tenant): Promise<void>
   {
@@ -121,22 +138,35 @@ export class TenantOperator
 
     this.log.info({ name }, "reconciling tenant");
 
-    // 1. Create/update PVC for tenant state
-    await applyResource(this.objectApi, this._buildPvc(tenant, namespace), this.log);
+    // 1. Create/update ServiceAccount (with Workload Identity if GCP)
+    await applyResource(this.objectApi, this._buildServiceAccount(tenant, namespace), this.log);
 
-    // 2. Create/update ConfigMap with merged OpenClaw config
+    // 2. Create BucketClaim if cloud storage is enabled
+    if (this.config.storageProvider && this.config.crossplaneEnabled)
+    {
+      await applyResource(
+        this.objectApi,
+        buildBucketClaim(name, namespace, this.config.bucketPrefix),
+        this.log,
+      );
+    }
+
+    // 3. Create encryption key Secret (only if it doesn't exist)
+    await this._ensureEncryptionKeySecret(name, namespace);
+
+    // 4. Create/update ConfigMap with merged OpenClaw config
     await applyResource(this.objectApi, this._buildConfigMap(tenant, namespace), this.log);
 
-    // 3. Create/update Deployment (single-pod OpenClaw instance)
+    // 5. Create/update Deployment (single-pod OpenClaw instance)
     await applyResource(this.objectApi, this._buildDeployment(tenant, namespace), this.log);
 
-    // 4. Create/update Service
+    // 6. Create/update Service
     await applyResource(this.objectApi, this._buildService(tenant, namespace), this.log);
 
-    // 5. Create/update Ingress rule
+    // 7. Create/update Ingress rule
     await applyResource(this.objectApi, this._buildIngress(tenant, namespace), this.log);
 
-    // 6. Update tenant status
+    // 8. Update tenant status
     await this._updateStatus(tenant, namespace, {
       phase: "Running",
       podName: `openclaw-${name}`,
@@ -147,7 +177,7 @@ export class TenantOperator
 
   /**
    * Suspend a tenant by scaling the deployment to zero replicas while
-   * preserving the PVC and other resources.
+   * preserving cloud storage and other resources.
    */
   private async suspendTenant(tenant: Tenant): Promise<void>
   {
@@ -156,7 +186,6 @@ export class TenantOperator
 
     this.log.info({ name }, "suspending tenant");
 
-    // Scale deployment to 0 but keep PVC
     const deployment = this._buildDeployment(tenant, namespace);
     deployment.spec!.replicas = 0;
     await applyResource(this.objectApi, deployment, this.log);
@@ -168,8 +197,8 @@ export class TenantOperator
   }
 
   /**
-   * Remove all child resources for a deleted tenant except the PVC,
-   * which is intentionally retained to preserve data.
+   * Remove child resources for a deleted tenant.
+   * Retains: BucketClaim (data preservation), encryption key Secret (recovery).
    */
   private async cleanupTenant(tenant: Tenant): Promise<void>
   {
@@ -178,8 +207,6 @@ export class TenantOperator
 
     this.log.info({ name }, "cleaning up tenant resources");
 
-    // Delete in reverse order (ingress, service, deployment, configmap)
-    // PVC is intentionally kept to preserve data
     await deleteResource(this.objectApi, {
       apiVersion: "networking.k8s.io/v1",
       kind: "Ingress",
@@ -204,30 +231,74 @@ export class TenantOperator
       metadata: { name: `openclaw-${name}-config`, namespace },
     }, this.log);
 
-    this.log.info({ name }, "tenant cleanup complete (PVC retained)");
+    await deleteResource(this.objectApi, {
+      apiVersion: "v1",
+      kind: "ServiceAccount",
+      metadata: { name: `openclaw-${name}`, namespace },
+    }, this.log);
+
+    this.log.info({ name }, "tenant cleanup complete (bucket + encryption key retained)");
   }
 
   /**
-   * Build a PersistentVolumeClaim for the tenant's state directory.
+   * Build a ServiceAccount for the tenant pod.
+   * When GCP storage is configured, includes the Workload Identity annotation
+   * so the pod can access its GCS bucket via IAM.
    */
-  private _buildPvc(tenant: Tenant, namespace: string): k8s.V1PersistentVolumeClaim
+  private _buildServiceAccount(tenant: Tenant, namespace: string): k8s.V1ServiceAccount
   {
     const name = tenant.metadata!.name!;
+    const annotations: Record<string, string> = {};
+
+    if (this.config.storageProvider === "gcs" && this.config.gcpProject)
+    {
+      annotations["iam.gke.io/gcp-service-account"] =
+        `opencrane-${name}@${this.config.gcpProject}.iam.gserviceaccount.com`;
+    }
+
     return {
       apiVersion: "v1",
-      kind: "PersistentVolumeClaim",
+      kind: "ServiceAccount",
       metadata: {
-        name: `openclaw-${name}-state`,
+        name: `openclaw-${name}`,
         namespace,
         labels: this._tenantLabels(name),
-      },
-      spec: {
-        accessModes: ["ReadWriteOnce"],
-        resources: {
-          requests: { storage: "1Gi" },
-        },
+        annotations,
       },
     };
+  }
+
+  /**
+   * Ensure an encryption key Secret exists for the tenant.
+   * Creates a new one with a random 256-bit key if none exists.
+   */
+  private async _ensureEncryptionKeySecret(name: string, namespace: string): Promise<void>
+  {
+    const secretName = `openclaw-${name}-encryption-key`;
+
+    try
+    {
+      await this.coreApi.readNamespacedSecret({ name: secretName, namespace });
+      this.log.debug({ name, secretName }, "encryption key secret already exists");
+    }
+    catch
+    {
+      const key = randomBytes(32).toString("base64");
+      const secret: k8s.V1Secret = {
+        apiVersion: "v1",
+        kind: "Secret",
+        metadata: {
+          name: secretName,
+          namespace,
+          labels: this._tenantLabels(name),
+        },
+        type: "Opaque",
+        data: { key },
+      };
+
+      await applyResource(this.objectApi, secret, this.log);
+      this.log.info({ name, secretName }, "created encryption key secret");
+    }
   }
 
   /**
@@ -249,7 +320,6 @@ export class TenantOperator
       },
     };
 
-    // Merge config overrides from Tenant CR
     const merged = tenant.spec.configOverrides
       ? { ...baseConfig, ...tenant.spec.configOverrides }
       : baseConfig;
@@ -269,48 +339,62 @@ export class TenantOperator
   }
 
   /**
-   * Build a Deployment running a single-replica OpenClaw gateway pod
-   * with state, config, and shared-skills volume mounts.
+   * Build a Deployment running a single-replica OpenClaw gateway pod.
+   * Uses GCS Fuse CSI for tenant storage when cloud storage is configured,
+   * otherwise falls back to a PVC.
    */
   private _buildDeployment(tenant: Tenant, namespace: string): k8s.V1Deployment
   {
     const name = tenant.metadata!.name!;
     const image = tenant.spec.openclawImage ?? this.config.tenantDefaultImage;
     const resources = tenant.spec.resources;
+    const openclawVersion = tenant.spec.openclawVersion ?? "latest";
 
     const envVars: k8s.V1EnvVar[] = [
       { name: "OPENCLAW_STATE_DIR", value: "/data/openclaw" },
+      { name: "OPENCLAW_SECRETS_DIR", value: "/data/secrets" },
+      { name: "OPENCLAW_ENCRYPTION_KEY_PATH", value: "/etc/openclaw/encryption-key/key" },
+      { name: "OPENCLAW_TENANT_NAME", value: name },
+      { name: "OPENCLAW_VERSION", value: openclawVersion },
     ];
 
     const volumeMounts: k8s.V1VolumeMount[] = [
-      { name: "state", mountPath: "/data/openclaw" },
       { name: "config", mountPath: "/config", readOnly: true },
+      { name: "shared-skills", mountPath: "/shared-skills", readOnly: true },
+      { name: "pod-secrets", mountPath: "/data/secrets" },
+      { name: "encryption-key", mountPath: "/etc/openclaw/encryption-key", readOnly: true },
     ];
 
     const volumes: k8s.V1Volume[] = [
-      {
-        name: "state",
-        persistentVolumeClaim: { claimName: `openclaw-${name}-state` },
-      },
-      {
-        name: "config",
-        configMap: { name: `openclaw-${name}-config` },
-      },
+      { name: "config", configMap: { name: `openclaw-${name}-config` } },
+      { name: "shared-skills", persistentVolumeClaim: { claimName: this.config.sharedSkillsPvcName, readOnly: true } },
+      { name: "pod-secrets", emptyDir: { medium: "Memory", sizeLimit: "10Mi" } },
+      { name: "encryption-key", secret: { secretName: `openclaw-${name}-encryption-key` } },
     ];
 
-    // Mount shared skills if configured
-    volumeMounts.push({
-      name: "shared-skills",
-      mountPath: "/shared-skills",
-      readOnly: true,
-    });
-    volumes.push({
-      name: "shared-skills",
-      persistentVolumeClaim: {
-        claimName: this.config.sharedSkillsPvcName,
-        readOnly: true,
-      },
-    });
+    // Tenant storage: GCS Fuse CSI or PVC fallback
+    if (this.config.storageProvider && this.config.csiDriver)
+    {
+      volumeMounts.unshift({ name: "tenant-storage", mountPath: "/data/openclaw" });
+      volumes.unshift({
+        name: "tenant-storage",
+        csi: {
+          driver: this.config.csiDriver,
+          volumeAttributes: {
+            bucketName: `${this.config.bucketPrefix}-${name}`,
+          },
+        },
+      } as k8s.V1Volume);
+    }
+    else
+    {
+      // PVC fallback for local/non-cloud environments
+      volumeMounts.unshift({ name: "tenant-storage", mountPath: "/data/openclaw" });
+      volumes.unshift({
+        name: "tenant-storage",
+        persistentVolumeClaim: { claimName: `openclaw-${name}-state` },
+      });
+    }
 
     return {
       apiVersion: "apps/v1",
@@ -330,39 +414,26 @@ export class TenantOperator
             labels: {
               ...this._tenantLabels(name),
               "opencrane.io/tenant": name,
-              ...(tenant.spec.team
-                ? { "opencrane.io/team": tenant.spec.team }
-                : {}),
+              ...(tenant.spec.team ? { "opencrane.io/team": tenant.spec.team } : {}),
             },
           },
           spec: {
+            serviceAccountName: `openclaw-${name}`,
             containers: [
               {
                 name: "openclaw",
                 image,
-                ports: [
-                  {
-                    name: "gateway",
-                    containerPort: this.config.gatewayPort,
-                  },
-                ],
+                ports: [{ name: "gateway", containerPort: this.config.gatewayPort }],
                 env: envVars,
                 envFrom: [
-                  {
-                    secretRef: {
-                      name: "org-shared-secrets",
-                      optional: true,
-                    },
-                  },
+                  { secretRef: { name: "org-shared-secrets", optional: true } },
                 ],
                 volumeMounts,
                 resources: resources
                   ? {
                       requests: {
                         ...(resources.cpu ? { cpu: resources.cpu } : {}),
-                        ...(resources.memory
-                          ? { memory: resources.memory }
-                          : {}),
+                        ...(resources.memory ? { memory: resources.memory } : {}),
                       },
                     }
                   : undefined,
@@ -371,7 +442,7 @@ export class TenantOperator
                     path: "/healthz",
                     port: this.config.gatewayPort as never,
                   },
-                  initialDelaySeconds: 10,
+                  initialDelaySeconds: 60,
                   periodSeconds: 30,
                 },
               },
@@ -464,7 +535,8 @@ export class TenantOperator
   ): Promise<void>
   {
     const name = tenant.metadata!.name!;
-    try {
+    try
+    {
       await this.customApi.patchNamespacedCustomObjectStatus({
         group: API_GROUP,
         version: API_VERSION,
@@ -473,7 +545,9 @@ export class TenantOperator
         name,
         body: { status: { ...tenant.status, ...status } },
       });
-    } catch (err) {
+    }
+    catch (err)
+    {
       this.log.warn({ err, name }, "failed to update tenant status");
     }
   }

@@ -33,6 +33,14 @@ controlPlane:
     limits:
       cpu: 500m
       memory: 512Mi
+  # -- PostgreSQL database connection
+  database:
+    # -- Direct connection string (use existingSecret in production)
+    url: ""
+    # -- Name of an existing K8s Secret containing DATABASE_URL
+    existingSecret: ""
+    # -- Key within the Secret that holds the connection string
+    secretKey: DATABASE_URL
 
 # -- Default tenant pod settings (can be overridden per Tenant CR)
 tenant:
@@ -47,11 +55,18 @@ tenant:
     limits:
       cpu: "1"
       memory: 1Gi
-  pvc:
-    storageClass: ""
-    size: 1Gi
   # -- OpenClaw gateway port inside tenant pods
   gatewayPort: 18789
+  # -- Per-tenant cloud storage (GCS bucket, Azure Blob, S3)
+  storage:
+    # -- Cloud storage provider: gcs, azure-blob, s3, or "" for PVC fallback
+    provider: ""
+    # -- Bucket name prefix (bucket name = {prefix}-{tenantName})
+    bucketPrefix: ""
+    # -- CSI driver for mounting cloud storage into pods
+    csiDriver: ""
+    # -- GCP project ID (required for Workload Identity with GCS)
+    gcpProject: ""
 
 # -- Ingress settings
 ingress:
@@ -65,12 +80,12 @@ ingress:
     # -- Secret name for wildcard TLS cert (*.domain)
     secretName: opencrane-wildcard-tls
 
-# -- Shared skills volume
+# -- Shared skills volume (only K8s-resident PVC remaining)
 sharedSkills:
   enabled: true
   pvc:
     storageClass: ""
-    # -- Must support ReadWriteMany (NFS, CephFS, etc.)
+    # -- Must support ReadWriteMany (NFS, CephFS, Filestore CSI, etc.)
     accessMode: ReadWriteMany
     size: 5Gi
 
@@ -94,3 +109,22 @@ orgSecrets:
   envMappings: {}
   #   openai-api-key: OPENAI_API_KEY
   #   anthropic-api-key: ANTHROPIC_API_KEY
+
+# -- Crossplane integration for dynamic cloud resource provisioning
+crossplane:
+  enabled: false
+  # -- Cloud provider: gcp, azure, aws
+  provider: ""
+
+# -- External Secrets Operator integration
+externalSecrets:
+  enabled: false
+  # -- Secret store provider: gcp-secret-manager, azure-key-vault, aws-secrets-manager
+  provider: ""
+
+# -- Cloud-native observability (no in-cluster stack needed)
+observability:
+  # -- Enable structured logging for Cloud Logging (GKE auto-ingests)
+  cloudLogging: false
+  # -- Enable Cloud Error Reporting integration
+  cloudErrorReporting: false

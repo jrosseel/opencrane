@@ -20,6 +20,9 @@ export interface TenantSpec
   /** Custom container image override for the tenant pod. */
   openclawImage?: string;
 
+  /** OpenClaw version to install (e.g. "latest", "2026.3.15"). Defaults to "latest". */
+  openclawVersion?: string;
+
   /** Resource requests for the tenant container. */
   resources?: {
     /** CPU resource request (e.g. "500m"). */
@@ -158,6 +161,21 @@ export interface OperatorConfig
 
   /** Port number exposed by the OpenClaw gateway inside tenant pods. */
   gatewayPort: number;
+
+  /** Cloud storage provider type (empty string = PVC fallback). */
+  storageProvider: "gcs" | "azure-blob" | "s3" | "";
+
+  /** Bucket name prefix for tenant storage. */
+  bucketPrefix: string;
+
+  /** GCP project ID for Workload Identity bindings. */
+  gcpProject: string;
+
+  /** CSI driver name for mounting cloud storage into pods. */
+  csiDriver: string;
+
+  /** Whether Crossplane manages storage resources. */
+  crossplaneEnabled: boolean;
 }
 
 /**
@@ -173,5 +191,10 @@ export function loadOperatorConfig(): OperatorConfig
     ingressClassName: process.env.INGRESS_CLASS_NAME ?? "nginx",
     sharedSkillsPvcName: process.env.SHARED_SKILLS_PVC_NAME ?? "opencrane-shared-skills",
     gatewayPort: Number(process.env.GATEWAY_PORT ?? "18789"),
+    storageProvider: (process.env.STORAGE_PROVIDER ?? "") as OperatorConfig["storageProvider"],
+    bucketPrefix: process.env.BUCKET_PREFIX ?? "opencrane",
+    gcpProject: process.env.GCP_PROJECT ?? "",
+    csiDriver: process.env.CSI_DRIVER ?? "",
+    crossplaneEnabled: process.env.CROSSPLANE_ENABLED === "true",
   };
 }
