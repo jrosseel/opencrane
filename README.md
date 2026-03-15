@@ -1,49 +1,85 @@
 # OpenCrane Platform
 
-Multi-tenant [OpenClaw](https://github.com/openclaw/openclaw) platform on Kubernetes. Each tenant (team member) gets an isolated OpenClaw instance behind a subdomain (`jente.opencrane.ai`).
+Multi-tenant [OpenClaw](https://github.com/openclaw/openclaw) platform on Kubernetes. Each tenant (team member) gets an isolated OpenClaw instance with per-tenant cloud storage and IAM-scoped access, behind a subdomain (`jente.opencrane.ai`).
 
 ## Architecture
 
 ```
-                    ┌──────────────────────────┐
-                    │   Control Plane (1x)      │
-                    │   admin.opencrane.ai      │
-                    └────────────┬─────────────┘
-                                 │
-                  ┌──────────────┼──────────────┐
-                  │              │              │
-            ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
-            │ jente.oc   │ │ sarah.oc   │ │ mike.oc   │
-            │ OpenClaw   │ │ OpenClaw   │ │ OpenClaw   │
-            │ (isolated) │ │ (isolated) │ │ (isolated) │
-            └────────────┘ └────────────┘ └────────────┘
-                Pod             Pod             Pod
+                         ┌─────────────────────┐
+                         │  Cloud SQL (Postgres) │
+                         └──────────┬──────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │     Control Plane (Express)    │
+                    │     admin.opencrane.ai         │
+                    │     Prisma ORM + K8s dual-write│
+                    └───────────────┬───────────────┘
+                                    │
+                  ┌─────────────────┼─────────────────┐
+                  │                 │                  │
+            ┌─────▼──────┐  ┌──────▼──────┐  ┌───────▼─────┐
+            │ jente.oc    │  │ sarah.oc    │  │ mike.oc     │
+            │ OpenClaw    │  │ OpenClaw    │  │ OpenClaw    │
+            │ (isolated)  │  │ (isolated)  │  │ (isolated)  │
+            └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+                   │                │                 │
+            ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐
+            │ GCS Bucket   │  │ GCS Bucket   │  │ GCS Bucket   │
+            │ (IAM-scoped) │  │ (IAM-scoped) │  │ (IAM-scoped) │
+            └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
-- **Tenant isolation**: Each user runs in their own pod with dedicated storage
-- **Credentials**: Per-tenant secrets on PVC + org-wide secrets from Kubernetes/Vault
-- **Skills**: Developed individually, promoted to team/org via shared volume
-- **Access control**: Network-level domain allowlisting via CiliumNetworkPolicy
-- **Control plane**: Fleet management, skill registry, policy engine, audit logs
+### Key Design Decisions
+
+- **Tenant isolation**: Each user runs in their own pod with a dedicated GCS bucket mounted via GCS Fuse CSI. IAM-enforced: each pod's Workload Identity service account can only access its own bucket.
+- **GCS-resident OpenClaw**: The Docker image is a slim Node 22 runtime. OpenClaw is npm-installed into the per-tenant GCS bucket on first boot and persists across pod restarts. Tenants update independently via `openclaw update`.
+- **Credentials**: Encrypted emptyDir (memory-backed) for pod-local secrets + K8s Secret for encryption key. Org-wide secrets via External Secrets Operator + GCP Secret Manager.
+- **Skills**: Developed individually in tenant pods, promoted to team/org via a shared ReadWriteMany PVC (GCP Filestore).
+- **Access control**: Network-level domain allowlisting via CiliumNetworkPolicy, managed by AccessPolicy CRDs.
+- **Observability**: Structured JSON logs (pino) shipped to Cloud Logging by GKE natively. No in-cluster logging stack required.
+- **Dual-write**: Control plane writes tenant state to both K8s CRDs (source of truth for operator) and PostgreSQL (query store for dashboard/API).
+- **IaC**: Terraform for static infra (GKE, Cloud SQL, VPC). Crossplane for dynamic per-tenant resources (GCS buckets, IAM bindings).
+
+### Storage Layout
+
+```
+Pod filesystem (ephemeral):
+  /data/secrets/                     -- Encrypted emptyDir (pod-local secrets)
+  /etc/openclaw/encryption-key/      -- K8s Secret projected as file
+
+GCS Fuse CSI mount (per-tenant bucket, IAM-scoped):
+  /data/openclaw/
+    ├── runtime/                     -- OpenClaw npm install (persists across restarts)
+    ├── config/
+    ├── agents/
+    ├── sessions/
+    ├── uploads/
+    └── knowledge/
+
+Shared skills (ReadOnly PVC, GCP Filestore):
+  /shared-skills/                    -- Org/team skills library
+```
 
 ## Components
 
 | Component | Path | Description |
 |-----------|------|-------------|
-| Helm chart | `helm/opencrane/` | Kubernetes manifests, CRDs, operator + control plane deployments |
+| Helm chart | `helm/opencrane/` | K8s manifests, CRDs, operator + control plane deployments |
 | Operator | `operator/` | Watches Tenant/AccessPolicy CRDs, reconciles per-tenant resources |
-| Control Plane | `control-plane/` | REST API for tenant, skill, and policy management |
+| Control Plane | `control-plane/` | Express REST API with Prisma ORM for tenant/skill/policy management |
 | Docker | `docker/` | Container images for tenant pods, operator, and control plane |
 | Skills | `skills/shared/` | Org/team shared skill library |
+| Terraform | `terraform/` | GCP infrastructure: GKE, Cloud SQL, VPC, Crossplane |
 
 ## Quick Start
 
 ### Prerequisites
 
-- Kubernetes cluster (1.28+)
+- Node 22+, pnpm 10+
+- Kubernetes 1.28+ (GKE recommended)
 - Helm 3
-- pnpm 10+
-- Node 22+
+- Terraform 1.5+ (for GCP deployment)
+- PostgreSQL 15+ (Cloud SQL or local)
 
 ### Development
 
@@ -53,15 +89,22 @@ pnpm build
 pnpm test
 ```
 
-### Deploy
+### GCP Deployment
 
 ```bash
-# Install CRDs and platform components
-helm install opencrane helm/opencrane \
-  --set ingress.domain=opencrane.ai \
-  --set ingress.tls.enabled=true
+# 1. Provision infrastructure
+cd terraform/environments/dev
+cp terraform.tfvars.example terraform.tfvars  # edit with your GCP project
+terraform init && terraform apply
 
-# Create a tenant
+# 2. Install the platform
+helm install opencrane helm/opencrane \
+  -f helm/opencrane/values-gcp.yaml \
+  --set tenant.storage.gcpProject=my-project \
+  --set ingress.domain=opencrane.ai \
+  --set controlPlane.database.existingSecret=opencrane-cloudsql
+
+# 3. Create a tenant
 kubectl apply -f - <<EOF
 apiVersion: opencrane.io/v1alpha1
 kind: Tenant
@@ -73,7 +116,24 @@ spec:
 EOF
 ```
 
-The operator automatically creates the pod, service, PVC, and ingress rule. Access at `https://jente.opencrane.ai`.
+The operator creates a GCS bucket, Workload Identity service account, encryption key, deployment, service, and ingress. Access at `https://jente.opencrane.ai`.
+
+### Version Pinning
+
+Pin a tenant to a specific OpenClaw version:
+
+```yaml
+apiVersion: opencrane.io/v1alpha1
+kind: Tenant
+metadata:
+  name: jente
+spec:
+  displayName: Jente
+  email: jente@example.com
+  openclawVersion: "2026.3.15"
+```
+
+Without `openclawVersion`, tenants install `latest` on first boot and can self-update via `openclaw update`.
 
 ## License
 
