@@ -15,17 +15,28 @@ output "cluster_endpoint"
   sensitive   = true
 }
 
-output "database_connection_name"
+output "registry_url"
 {
-  description = "Cloud SQL connection name (project:region:instance)"
-  value       = module.cloudsql.connection_name
+  description = "Artifact Registry URL for Docker images"
+  value       = module.artifact_registry.repository_url
 }
 
-output "database_private_ip"
+output "ingress_ip"
 {
-  description = "Cloud SQL private IP address"
-  value       = module.cloudsql.private_ip
-  sensitive   = true
+  description = "External IP for the ingress controller"
+  value       = module.app_deploy.ingress_ip
+}
+
+output "control_plane_url"
+{
+  description = "URL for the OpenCrane control-plane UI"
+  value       = module.app_deploy.control_plane_url
+}
+
+output "dns_name_servers"
+{
+  description = "Name servers — delegate your domain to these"
+  value       = module.dns.name_servers
 }
 
 output "database_url"

@@ -15,11 +15,11 @@ ingress:
   className: gce
   annotations:
     kubernetes.io/ingress.class: gce
-    networking.gke.io/managed-certificates: opencrane-cert
 
 controlPlane:
   database:
-    existingSecret: opencrane-cloudsql
+    # In-cluster PostgreSQL — secret created by Terraform app-deploy module
+    existingSecret: opencrane-db
     secretKey: DATABASE_URL
 
 crossplane:

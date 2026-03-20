@@ -41,5 +41,9 @@ spec:
               value: {{ .Values.tenant.storage.csiDriver | quote }}
             - name: CROSSPLANE_ENABLED
               value: {{ .Values.crossplane.enabled | quote }}
+            - name: IDLE_TIMEOUT_MINUTES
+              value: {{ .Values.operator.idleTimeoutMinutes | quote }}
+            - name: IDLE_CHECK_INTERVAL_SECONDS
+              value: {{ .Values.operator.idleCheckIntervalSeconds | quote }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}

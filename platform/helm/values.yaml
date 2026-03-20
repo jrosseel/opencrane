@@ -16,6 +16,10 @@ operator:
       memory: 256Mi
   # -- Namespace to watch for Tenant CRs (empty = all namespaces)
   watchNamespace: ""
+  # -- Minutes of inactivity before auto-suspending a tenant (0 = disabled)
+  idleTimeoutMinutes: 30
+  # -- How often (seconds) the idle-checker scans for inactive tenants
+  idleCheckIntervalSeconds: 60
 
 # -- Control plane settings
 controlPlane:
@@ -51,10 +55,10 @@ tenant:
   defaultResources:
     requests:
       cpu: 250m
-      memory: 256Mi
+      memory: 4Gi
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 4Gi
   # -- OpenClaw gateway port inside tenant pods
   gatewayPort: 18789
   # -- Per-tenant cloud storage (GCS bucket, Azure Blob, S3)

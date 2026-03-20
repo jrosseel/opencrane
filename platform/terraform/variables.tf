@@ -38,38 +38,17 @@ variable "cluster_name"
   default     = "opencrane-cluster"
 }
 
-variable "node_machine_type"
+# Domain & DNS
+variable "domain"
 {
-  description = "Machine type for GKE node pool"
+  description = "Base domain for tenant subdomains (e.g. opencrane.example.com)"
   type        = string
-  default     = "e2-standard-4"
 }
 
-# Cloud SQL
-variable "db_instance_name"
+# Container images
+variable "image_tag"
 {
-  description = "Cloud SQL instance name"
+  description = "Docker image tag for OpenCrane components"
   type        = string
-  default     = "opencrane-db"
-}
-
-variable "db_name"
-{
-  description = "Name of the PostgreSQL database"
-  type        = string
-  default     = "opencrane"
-}
-
-variable "db_tier"
-{
-  description = "Cloud SQL machine tier"
-  type        = string
-  default     = "db-f1-micro"
-}
-
-variable "db_high_availability"
-{
-  description = "Enable high availability for Cloud SQL"
-  type        = bool
-  default     = false
+  default     = "latest"
 }

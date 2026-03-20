@@ -1,8 +1,8 @@
 # -----------------------------------------------------------------------------
 # GKE module
 #
-# Private GKE cluster with Workload Identity, GCS Fuse CSI, and an
-# autoscaling node pool.
+# GKE Autopilot cluster — Google manages nodes, bin-packing, and scaling.
+# Nodes scale to zero when no pods are scheduled. You pay per pod resource.
 # -----------------------------------------------------------------------------
 
 resource "google_container_cluster" "cluster"
@@ -16,9 +16,8 @@ resource "google_container_cluster" "cluster"
   network    = var.vpc_id
   subnetwork = var.subnet_id
 
-  # Use a separately managed node pool
-  remove_default_node_pool = true
-  initial_node_count       = 1
+  # Autopilot mode — no node pools to manage
+  enable_autopilot = true
 
   # Private cluster configuration
   private_cluster_config
@@ -45,21 +44,6 @@ resource "google_container_cluster" "cluster"
     services_secondary_range_name = "services"
   }
 
-  # Workload Identity
-  workload_identity_config
-  {
-    workload_pool = "${var.project_id}.svc.id.goog"
-  }
-
-  # GCS Fuse CSI driver
-  addons_config
-  {
-    gcs_fuse_csi_driver_config
-    {
-      enabled = true
-    }
-  }
-
   # Release channel for automatic upgrades
   release_channel
   {
@@ -67,50 +51,4 @@ resource "google_container_cluster" "cluster"
   }
 
   deletion_protection = false
-}
-
-resource "google_container_node_pool" "primary"
-{
-  name     = "${var.cluster_name}-primary"
-  project  = var.project_id
-  location = var.region
-  cluster  = google_container_cluster.cluster.name
-
-  # Autoscaling: 1 to 5 nodes
-  autoscaling
-  {
-    min_node_count = 1
-    max_node_count = 5
-  }
-
-  node_config
-  {
-    machine_type = var.node_machine_type
-    disk_size_gb = 100
-    disk_type    = "pd-standard"
-
-    oauth_scopes =
-    [
-      "https://www.googleapis.com/auth/cloud-platform",
-    ]
-
-    # Workload Identity on nodes
-    workload_metadata_config
-    {
-      mode = "GKE_METADATA"
-    }
-
-    labels =
-    {
-      environment = "opencrane"
-    }
-
-    tags = ["opencrane-gke-node"]
-  }
-
-  management
-  {
-    auto_repair  = true
-    auto_upgrade = true
-  }
 }
