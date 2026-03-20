@@ -1,6 +1,8 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from "@angular/core";
 import { provideHttpClient, withFetch } from "@angular/common/http";
 import { provideRouter, withComponentInputBinding } from "@angular/router";
+import { providePrimeNG } from "primeng/config";
+import Nora from "@primeuix/themes/nora";
 
 import { appRoutes } from "./app.routes";
 
@@ -8,6 +10,12 @@ import { appRoutes } from "./app.routes";
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    providePrimeNG({
+      theme: {
+        preset: Nora,
+      },
+      ripple: true,
+    }),
     provideRouter(appRoutes, withComponentInputBinding()),
     provideHttpClient(withFetch()),
   ],

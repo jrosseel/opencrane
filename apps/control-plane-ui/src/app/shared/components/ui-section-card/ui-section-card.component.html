@@ -1,0 +1,13 @@
+<p-card>
+  <div class="heading">
+    <div>
+      <h2>{{ title }}</h2>
+      <p *ngIf="subtitle">{{ subtitle }}</p>
+    </div>
+    <div class="actions">
+      <ng-content select="[actions]"></ng-content>
+    </div>
+  </div>
+
+  <ng-content></ng-content>
+</p-card>

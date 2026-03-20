@@ -1,13 +1,26 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "compileOnSave": false,
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "./dist/out-tsc",
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "module": "es2022",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
     "types": []
   },
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ]
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
 }

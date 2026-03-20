@@ -63,3 +63,71 @@ model Skill {
   @@id([name, scope, team])
   @@map("skills")
 }
+
+model ServerMetricSnapshot {
+  id               Int      @id @default(autoincrement())
+  cpuPercent       Float    @map("cpu_percent")
+  memoryUsedBytes  BigInt   @map("memory_used_bytes")
+  memoryTotalBytes BigInt   @map("memory_total_bytes")
+  storageUsedBytes BigInt   @map("storage_used_bytes")
+  storageTotalBytes BigInt  @map("storage_total_bytes")
+  activeTenants    Int      @default(0) @map("active_tenants")
+  sampledAt        DateTime @default(now()) @map("sampled_at")
+
+  @@index([sampledAt])
+  @@map("server_metric_snapshots")
+}
+
+model TokenUsageSnapshot {
+  id           Int      @id @default(autoincrement())
+  userId       String   @map("user_id")
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
+  totalTokens  Int      @default(0) @map("total_tokens")
+  currency     String
+  totalCost    Decimal  @db.Decimal(12, 4) @map("total_cost")
+  sampledAt    DateTime @default(now()) @map("sampled_at")
+
+  @@unique([userId, currency])
+  @@index([sampledAt])
+  @@map("token_usage_snapshots")
+}
+
+model GlobalBudgetSetting {
+  id            Int      @id @default(1)
+  currency      String
+  ceilingAmount Decimal  @db.Decimal(12, 2) @map("ceiling_amount")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("global_budget_settings")
+}
+
+model AccountBudgetSetting {
+  userId        String   @id @map("user_id")
+  currency      String
+  ceilingAmount Decimal  @db.Decimal(12, 2) @map("ceiling_amount")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("account_budget_settings")
+}
+
+model AccessToken {
+  id         String   @id @default(cuid())
+  name       String
+  owner      String
+  tokenHash  String   @unique @map("token_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime? @map("expires_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  @@index([owner])
+  @@map("access_tokens")
+}
+
+model ProviderApiKey {
+  provider  String   @id
+  keyValue  String   @map("key_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("provider_api_keys")
+}

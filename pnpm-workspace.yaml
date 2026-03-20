@@ -1,3 +1,4 @@
 packages:
   - apps/operator
   - apps/control-plane
+  - apps/control-plane-ui

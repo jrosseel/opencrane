@@ -1,0 +1,44 @@
+<section class="stack">
+  <oc-ui-section-card title="Global API Key Management" subtitle="Store provider keys securely for OpenAI and Claude integrations.">
+    <div class="forms">
+      <form [formGroup]="keyForm" (ngSubmit)="saveOpenAi()" class="form-row">
+        <label>OpenAI key</label>
+        <input pInputText type="password" formControlName="openai" placeholder="sk-..." />
+        <p-button type="submit" label="Save OpenAI key"></p-button>
+      </form>
+
+      <form [formGroup]="keyForm" (ngSubmit)="saveClaude()" class="form-row">
+        <label>Claude key</label>
+        <input pInputText type="password" formControlName="claude" placeholder="sk-ant-..." />
+        <p-button type="submit" label="Save Claude key" severity="secondary"></p-button>
+      </form>
+    </div>
+
+    <p *ngIf="message()" class="message">{{ message() }}</p>
+  </oc-ui-section-card>
+
+  <oc-ui-section-card title="Configured Providers" subtitle="Current provider key status.">
+    <p-table [value]="keys()">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Provider</th>
+          <th>Status</th>
+          <th>Masked Value</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-item>
+        <tr>
+          <td>{{ item.provider }}</td>
+          <td><p-tag [severity]="configuredState(item.configured)" [value]="item.configured ? 'Configured' : 'Missing'"></p-tag></td>
+          <td>{{ item.maskedValue || '-' }}</td>
+          <td>{{ item.updatedAt ? (item.updatedAt | date : 'medium') : '-' }}</td>
+          <td>
+            <p-button label="Delete" severity="danger" size="small" [disabled]="!item.configured" (onClick)="deleteProviderKey(item.provider)"></p-button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </oc-ui-section-card>
+</section>

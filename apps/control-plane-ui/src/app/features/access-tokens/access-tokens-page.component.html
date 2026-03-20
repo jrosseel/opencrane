@@ -1,0 +1,40 @@
+<section class="stack">
+  <oc-ui-section-card title="Create Access Token" subtitle="Issue scoped tokens for platform automation and integrations.">
+    <form [formGroup]="tokenForm" (ngSubmit)="createToken()" class="form-row">
+      <input pInputText type="text" formControlName="name" placeholder="Token name" />
+      <input pInputText type="text" formControlName="owner" placeholder="Owner account" />
+      <input pInputText type="datetime-local" formControlName="expiresAt" />
+      <p-button type="submit" label="Create token"></p-button>
+    </form>
+
+    <p *ngIf="newlyCreatedToken()" class="secret">{{ newlyCreatedToken() }}</p>
+    <p *ngIf="message()" class="message">{{ message() }}</p>
+  </oc-ui-section-card>
+
+  <oc-ui-section-card title="Issued Tokens" subtitle="Revoke tokens that are no longer needed.">
+    <p-table [value]="tokens()" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[10, 20]">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Name</th>
+          <th>Owner</th>
+          <th>Created</th>
+          <th>Expires</th>
+          <th>Last Used</th>
+          <th></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-token>
+        <tr>
+          <td>{{ token.name }}</td>
+          <td>{{ token.owner }}</td>
+          <td>{{ token.createdAt | date : 'medium' }}</td>
+          <td>{{ token.expiresAt ? (token.expiresAt | date : 'medium') : '-' }}</td>
+          <td>{{ token.lastUsedAt ? (token.lastUsedAt | date : 'medium') : '-' }}</td>
+          <td>
+            <p-button label="Delete" severity="danger" size="small" (onClick)="revokeToken(token.id)"></p-button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </oc-ui-section-card>
+</section>

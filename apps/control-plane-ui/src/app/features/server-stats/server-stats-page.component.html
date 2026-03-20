@@ -1,0 +1,17 @@
+<oc-ui-section-card title="Server Utilization" subtitle="Live infrastructure load across CPU, memory, and storage.">
+  <div actions>
+    <p-button label="Refresh" icon="pi pi-refresh" size="small" (onClick)="refresh()"></p-button>
+  </div>
+
+  <p *ngIf="loading()">Loading metrics...</p>
+  <p *ngIf="error()" class="error">{{ error() }}</p>
+
+  <div *ngIf="stats() as current" class="grid">
+    <oc-ui-kpi-tile label="CPU" [value]="(current.cpuPercent | number : '1.0-1') + '%'" [progress]="current.cpuPercent"></oc-ui-kpi-tile>
+    <oc-ui-kpi-tile label="Memory" [value]="toGiB(current.memoryUsedBytes) + ' / ' + toGiB(current.memoryTotalBytes) + ' GiB'" [progress]="memoryUsagePercent()"></oc-ui-kpi-tile>
+    <oc-ui-kpi-tile label="Storage" [value]="toGiB(current.storageUsedBytes) + ' / ' + toGiB(current.storageTotalBytes) + ' GiB'" [progress]="storageUsagePercent()"></oc-ui-kpi-tile>
+    <oc-ui-kpi-tile label="Active Tenants" [value]="'' + current.activeTenants"></oc-ui-kpi-tile>
+  </div>
+
+  <p-tag *ngIf="stats()" severity="secondary" [value]="'Sampled at ' + sampledAtText()"></p-tag>
+</oc-ui-section-card>

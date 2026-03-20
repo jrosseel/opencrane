@@ -1,0 +1,34 @@
+.stack
+{
+  display: grid;
+  gap: 0.9rem;
+}
+
+.forms
+{
+  display: grid;
+  gap: 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.form-row
+{
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 220px;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.message
+{
+  margin: 0;
+  color: var(--ok);
+}
+
+@media (max-width: 800px)
+{
+  .form-row
+  {
+    grid-template-columns: 1fr;
+  }
+}

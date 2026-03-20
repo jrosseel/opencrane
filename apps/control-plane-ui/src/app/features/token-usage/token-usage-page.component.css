@@ -1,0 +1,27 @@
+.stack
+{
+  display: grid;
+  gap: 0.9rem;
+}
+
+.form-row
+{
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.message
+{
+  margin: 0;
+  color: var(--ok);
+}
+
+:host ::ng-deep .p-inputtext,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-select
+{
+  width: 100%;
+}

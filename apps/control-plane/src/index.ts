@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import * as k8s from "@kubernetes/client-node";
 import express from "express";
 import type { Express } from "express";
@@ -7,10 +9,15 @@ import { pinoHttp } from "pino-http";
 
 import { createPrismaClient, checkDbHealth } from "./db.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { accessTokensRouter } from "./routes/access-tokens.js";
 import { auditRouter } from "./routes/audit.js";
+import { budgetsRouter } from "./routes/budgets.js";
+import { metricsRouter } from "./routes/metrics.js";
 import { policiesRouter } from "./routes/policies.js";
+import { providerKeysRouter } from "./routes/provider-keys.js";
 import { skillsRouter } from "./routes/skills.js";
 import { tenantsRouter } from "./routes/tenants.js";
+import { tokenUsageRouter } from "./routes/token-usage.js";
 
 /** Application logger instance. */
 const log = pino({ name: "opencrane-control-plane" });
@@ -47,6 +54,29 @@ export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi,
   app.use("/api/skills", skillsRouter(prisma));
   app.use("/api/policies", policiesRouter(customApi, prisma));
   app.use("/api/audit", auditRouter(prisma));
+  app.use("/api/metrics", metricsRouter(prisma));
+  app.use("/api/token-usage", tokenUsageRouter(prisma));
+  app.use("/api/budgets", budgetsRouter(prisma));
+  app.use("/api/access-tokens", accessTokensRouter(prisma));
+  app.use("/api/providers/keys", providerKeysRouter(prisma));
+
+  const uiCandidates = [
+    join(process.cwd(), "apps/control-plane-ui/dist/control-plane-ui/browser"),
+    join(process.cwd(), "../control-plane-ui/dist/control-plane-ui/browser"),
+  ];
+  const uiDirectory = uiCandidates.find(function _hasBuild(candidate)
+  {
+    return existsSync(candidate);
+  });
+
+  if (uiDirectory)
+  {
+    app.use(express.static(uiDirectory));
+    app.get(/^(?!\/api|\/healthz).*/, function _spaFallback(req, res)
+    {
+      res.sendFile(join(uiDirectory, "index.html"));
+    });
+  }
 
   return app;
 }

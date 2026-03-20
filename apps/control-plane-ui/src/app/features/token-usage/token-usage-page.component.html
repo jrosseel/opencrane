@@ -1,0 +1,68 @@
+<section class="stack">
+  <oc-ui-section-card title="Global Token Budget Ceiling" subtitle="Set a hard monthly cap in USD or EUR.">
+    <form [formGroup]="globalBudgetForm" (ngSubmit)="saveGlobalBudget()" class="form-row">
+      <p-select formControlName="currency" [options]="currencies" optionLabel="label" optionValue="value" appendTo="body"></p-select>
+      <p-inputnumber formControlName="ceilingAmount" mode="decimal" [min]="0" [minFractionDigits]="2" [maxFractionDigits]="2"></p-inputnumber>
+      <p-button type="submit" label="Save global ceiling"></p-button>
+    </form>
+  </oc-ui-section-card>
+
+  <oc-ui-section-card title="Account Budget Ceiling" subtitle="Configure and enforce per-account budget limits.">
+    <form [formGroup]="accountBudgetForm" (ngSubmit)="saveAccountBudget()" class="form-row">
+      <input pInputText type="text" formControlName="userId" placeholder="john@company.com" />
+      <p-select formControlName="currency" [options]="currencies" optionLabel="label" optionValue="value" appendTo="body"></p-select>
+      <p-inputnumber formControlName="ceilingAmount" mode="decimal" [min]="0" [minFractionDigits]="2" [maxFractionDigits]="2"></p-inputnumber>
+      <p-button type="submit" label="Save account ceiling" severity="secondary"></p-button>
+    </form>
+
+    <p-table [value]="accountBudgets()" [paginator]="true" [rows]="5" [rowsPerPageOptions]="[5, 10, 20]">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Account</th>
+          <th>Currency</th>
+          <th>Ceiling</th>
+          <th></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-budget>
+        <tr>
+          <td>{{ budget.userId }}</td>
+          <td>{{ budget.currency }}</td>
+          <td>{{ budget.ceilingAmount | number : '1.2-2' }}</td>
+          <td>
+            <p-button label="Delete" severity="danger" size="small" (onClick)="deleteAccountBudget(budget.userId)"></p-button>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </oc-ui-section-card>
+
+  <oc-ui-section-card title="Token Usage by Account" subtitle="Input/output token activity and budget status.">
+    <p-table [value]="usage()" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[10, 20, 50]" [stripedRows]="true">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Account</th>
+          <th>Input</th>
+          <th>Output</th>
+          <th>Total</th>
+          <th>Cost</th>
+          <th>Budget</th>
+          <th>Status</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td>{{ row.userId }}</td>
+          <td>{{ row.inputTokens | number }}</td>
+          <td>{{ row.outputTokens | number }}</td>
+          <td>{{ row.totalTokens | number }}</td>
+          <td>{{ row.currency }} {{ row.totalCost | number : '1.2-2' }}</td>
+          <td>{{ row.budgetCeiling ? (row.currency + ' ' + (row.budgetCeiling | number : '1.2-2')) : '-' }}</td>
+          <td><p-tag [severity]="budgetState(row)" [value]="row.budgetCeiling ? (row.totalCost > row.budgetCeiling ? 'Over limit' : 'Within limit') : 'No ceiling'"></p-tag></td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </oc-ui-section-card>
+
+  <p *ngIf="message()" class="message">{{ message() }}</p>
+</section>

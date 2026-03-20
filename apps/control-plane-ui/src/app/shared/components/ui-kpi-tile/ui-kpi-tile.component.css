@@ -1,0 +1,21 @@
+.tile
+{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.label
+{
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.value
+{
+  margin: 0.4rem 0 0.7rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}

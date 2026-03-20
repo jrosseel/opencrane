@@ -1,0 +1,26 @@
+h2
+{
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+p
+{
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.heading
+{
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+
+.actions
+{
+  display: flex;
+  gap: 0.5rem;
+}

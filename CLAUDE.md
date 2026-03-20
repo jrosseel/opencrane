@@ -187,3 +187,34 @@ import { TenantOperator } from "@opencrane/operator";
 // WRONG
 import { TenantOperator } from "@opencrane/operator/src/tenant-operator";
 ```
+
+## Frontend Guidelines (Angular)
+
+### PrimeNG Standard
+
+For Angular frontend work, use PrimeNG as the default component library.
+
+- Prefer PrimeNG form, table, navigation, and feedback components over custom implementations.
+- Configure theme providers in `app.config.ts` using `providePrimeNG`.
+- Keep global visual tokens in `styles.css`; avoid ad-hoc per-page color systems.
+
+### Reusable Component Rule (Required)
+
+Always create reusable UI components before writing repeated page-level markup.
+
+- Shared visual wrappers (cards, KPI tiles, form sections, table shells) must live under `src/app/shared/components/**`.
+- Feature pages under `src/app/features/**` should compose shared components and services, not duplicate layout markup.
+- If the same pattern appears in 2+ places, refactor it into a shared component immediately.
+- Page components should focus on orchestration and data flow; display logic belongs in shared components.
+- Check these rules after every implementation cycle.
+
+### Frontend Layering
+
+- `core/`: API services, app-wide models, cross-cutting infrastructure.
+- `shared/`: reusable presentational components and UI primitives.
+- `features/`: route-level containers that compose `core` + `shared`.
+
+### Data Access
+
+- All HTTP calls must go through dedicated `core/api` services.
+- Do not issue HTTP requests directly from templates or shared presentational components.
