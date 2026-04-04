@@ -104,6 +104,7 @@ export class TenantResourceBuilder
       { name: "OPENCLAW_ENCRYPTION_KEY_PATH", value: "/etc/openclaw/encryption-key/key" },
       { name: "OPENCLAW_TENANT_NAME", value: name },
       { name: "OPENCLAW_VERSION", value: openclawVersion },
+      ...(tenant.spec.team ? [{ name: "OPENCRANE_TEAM", value: tenant.spec.team }] : []),
     ];
 
     const volumeMounts: k8s.V1VolumeMount[] = [

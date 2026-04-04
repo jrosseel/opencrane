@@ -17,6 +17,7 @@ spec:
         {{- include "opencrane.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: control-plane
     spec:
+      serviceAccountName: {{ include "opencrane.fullname" . }}-control-plane
       containers:
         - name: control-plane
           image: "{{ .Values.controlPlane.image.repository }}:{{ .Values.controlPlane.image.tag }}"
