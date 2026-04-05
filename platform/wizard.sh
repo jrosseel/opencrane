@@ -1,0 +1,236 @@
+#!/usr/bin/env bash
+# =============================================================================
+# OpenCrane Platform — Interactive Install Wizard
+#
+# Walks through configuration step-by-step and executes the chosen installer.
+#
+# Usage:
+#   ./platform/wizard.sh
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ---- Colours -----------------------------------------------------------------
+
+BOLD='\033[1m'
+DIM='\033[2m'
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ---- Helpers -----------------------------------------------------------------
+
+function _banner()
+{
+  echo ""
+  echo -e "${CYAN}${BOLD}  ██████╗ ██████╗ ███████╗███╗  ██╗${NC}"
+  echo -e "${CYAN}${BOLD} ██╔═══██╗██╔══██╗██╔════╝████╗ ██║${NC}"
+  echo -e "${CYAN}${BOLD} ██║   ██║██████╔╝█████╗  ██╔██╗██║${NC}"
+  echo -e "${CYAN}${BOLD} ██║   ██║██╔═══╝ ██╔══╝  ██║╚████║${NC}"
+  echo -e "${CYAN}${BOLD} ╚██████╔╝██║     ███████╗██║ ╚███║${NC}"
+  echo -e "${CYAN}${BOLD}  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚══╝  CRANE${NC}"
+  echo ""
+  echo -e "${DIM}  Multi-tenant AI agent platform on Kubernetes${NC}"
+  echo ""
+}
+
+function _step()
+{
+  echo ""
+  echo -e "${BLUE}${BOLD}──────────────────────────────────────────────────${NC}"
+  echo -e " ${BOLD}$1${NC}"
+  echo -e "${BLUE}${BOLD}──────────────────────────────────────────────────${NC}"
+  echo ""
+}
+
+function _prompt()
+{
+  local label="$1"
+  local default="${2:-}"
+  local var_name="$3"
+
+  if [[ -n "$default" ]]; then
+    printf "  ${BOLD}%s${NC} ${DIM}[%s]${NC}: " "$label" "$default"
+  else
+    printf "  ${BOLD}%s${NC}: " "$label"
+  fi
+
+  read -r input
+  if [[ -z "$input" && -n "$default" ]]; then
+    input="$default"
+  fi
+
+  # Assign to the caller's variable name via printf to a temp var
+  printf -v "$var_name" '%s' "$input"
+}
+
+function _check()
+{
+  local cmd="$1"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    echo -e "  ${GREEN}✓${NC} $cmd"
+  else
+    echo -e "  ${RED}✗${NC} $cmd ${RED}(not found — install before continuing)${NC}"
+    return 1
+  fi
+}
+
+function _summary_row()
+{
+  printf "  ${DIM}%-22s${NC} ${BOLD}%s${NC}\n" "$1" "$2"
+}
+
+# ---- Welcome -----------------------------------------------------------------
+
+_banner
+
+echo -e "${DIM}  This wizard will walk you through installing OpenCrane.${NC}"
+echo -e "${DIM}  Press Enter to accept defaults shown in [brackets].${NC}"
+
+# ---- Step 1: Choose mode -----------------------------------------------------
+
+_step "Step 1 of 4 — Install target"
+
+echo -e "  Where do you want to install OpenCrane?\n"
+echo -e "  ${BOLD}1)${NC} Local   — k3d cluster on this machine (development / smoke test)"
+echo -e "  ${BOLD}2)${NC} GCP     — Google Cloud (production / staging)"
+echo ""
+printf "  ${BOLD}Choose [1/2]${NC}: "
+read -r mode_choice
+mode_choice="${mode_choice:-1}"
+
+case "$mode_choice" in
+  1) mode="local" ;;
+  2) mode="gcp" ;;
+  *)
+    echo -e "${RED}  Invalid choice: $mode_choice${NC}"
+    exit 1
+    ;;
+esac
+
+echo ""
+echo -e "  ${GREEN}✓${NC} Target: ${BOLD}$mode${NC}"
+
+# ---- Step 2: Gather config ---------------------------------------------------
+
+if [[ "$mode" == "local" ]]; then
+
+  _step "Step 2 of 4 — Local cluster settings"
+
+  _prompt "Cluster name"    "opencrane-local"   CLUSTER_NAME
+  _prompt "Namespace"       "opencrane-system"  NAMESPACE
+
+  echo ""
+  printf "  ${BOLD}Keep cluster after install?${NC} ${DIM}[Y/n]${NC}: "
+  read -r keep_input
+  keep_input="${keep_input:-Y}"
+  if [[ "$keep_input" =~ ^[Yy]$ ]]; then
+    KEEP_CLUSTER="1"
+    keep_label="yes"
+  else
+    KEEP_CLUSTER="0"
+    keep_label="no"
+  fi
+
+else
+
+  _step "Step 2 of 4 — GCP configuration"
+
+  _prompt "GCP Project ID"              ""               PROJECT_ID
+  _prompt "Region"                      "europe-west1"   REGION
+  _prompt "Base domain"                 ""               DOMAIN
+  _prompt "Environment"                 "dev"            ENVIRONMENT
+
+  if [[ -z "$PROJECT_ID" ]]; then
+    echo -e "\n  ${RED}✗  GCP Project ID is required.${NC}"
+    exit 1
+  fi
+  if [[ -z "$DOMAIN" ]]; then
+    echo -e "\n  ${RED}✗  Base domain is required.${NC}"
+    exit 1
+  fi
+
+fi
+
+# ---- Step 3: Pre-flight check ------------------------------------------------
+
+_step "Step 3 of 4 — Pre-flight checks"
+
+has_error=0
+
+if [[ "$mode" == "local" ]]; then
+  _check docker  || has_error=1
+  _check kubectl || has_error=1
+  _check helm    || has_error=1
+  _check k3d     || has_error=1
+else
+  _check gcloud    || has_error=1
+  _check terraform || has_error=1
+  _check docker    || has_error=1
+  _check pnpm      || has_error=1
+fi
+
+if [[ "$has_error" == "1" ]]; then
+  echo ""
+  echo -e "  ${RED}One or more required tools are missing. Install them and re-run the wizard.${NC}"
+  exit 1
+fi
+
+echo ""
+echo -e "  ${GREEN}✓${NC} All required tools found."
+
+# ---- Step 4: Summary + confirm -----------------------------------------------
+
+_step "Step 4 of 4 — Summary"
+
+echo ""
+if [[ "$mode" == "local" ]]; then
+  _summary_row "Mode"           "local (k3d)"
+  _summary_row "Cluster name"   "$CLUSTER_NAME"
+  _summary_row "Namespace"      "$NAMESPACE"
+  _summary_row "Keep cluster"   "$keep_label"
+  _summary_row "Script"         "platform/tests/k3d-e2e.sh"
+else
+  _summary_row "Mode"           "GCP"
+  _summary_row "Project ID"     "$PROJECT_ID"
+  _summary_row "Region"         "$REGION"
+  _summary_row "Domain"         "$DOMAIN"
+  _summary_row "Environment"    "$ENVIRONMENT"
+  _summary_row "Script"         "platform/deploy.sh"
+fi
+echo ""
+
+printf "  ${BOLD}Everything looks good. Proceed?${NC} ${DIM}[Y/n]${NC}: "
+read -r confirm
+confirm="${confirm:-Y}"
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+  echo ""
+  echo -e "  ${YELLOW}Aborted.${NC}"
+  exit 0
+fi
+
+# ---- Execute -----------------------------------------------------------------
+
+echo ""
+echo -e "${GREEN}${BOLD}  ✦ Starting install...${NC}"
+echo ""
+
+if [[ "$mode" == "local" ]]; then
+  KEEP_CLUSTER="$KEEP_CLUSTER" \
+  CLUSTER_NAME="$CLUSTER_NAME" \
+  NAMESPACE="$NAMESPACE" \
+    "$SCRIPT_DIR/tests/k3d-e2e.sh"
+else
+  printf "%s\n%s\n%s\n%s\nY\n" \
+    "$PROJECT_ID" "$REGION" "$DOMAIN" "$ENVIRONMENT" \
+    | "$SCRIPT_DIR/deploy.sh"
+fi
+
+echo ""
+echo -e "${GREEN}${BOLD}  ✦ Done!${NC}"
+echo ""
