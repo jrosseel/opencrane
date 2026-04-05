@@ -20,6 +20,8 @@
     "build": "pnpm -r build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r test",
+    "test:e2e:k3d": "./platform/tests/k3d-e2e.sh",
+    "test:phase1": "pnpm --filter @opencrane/operator test && pnpm --filter @opencrane/control-plane test && ./platform/tests/k3d-e2e.sh",
     "lint": "pnpm -r lint",
     "docker:build:tenant": "docker build -f apps/tenant/deploy/Dockerfile -t ghcr.io/opencrane/tenant:latest .",
     "docker:build:operator": "docker build -f apps/operator/deploy/Dockerfile -t ghcr.io/opencrane/operator:latest .",
