@@ -10,13 +10,12 @@ import { pinoHttp } from "pino-http";
 import { createPrismaClient, checkDbHealth } from "./db.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { accessTokensRouter } from "./routes/access-tokens.js";
+import { aiBudgetRouter } from "./routes/ai-budget.js";
 import { auditRouter } from "./routes/audit.js";
-import { budgetsRouter } from "./routes/budgets.js";
 import { metricsRouter } from "./routes/metrics.js";
 import { policiesRouter } from "./routes/policies.js";
 import { providerKeysRouter } from "./routes/provider-keys.js";
 import { skillsRouter } from "./routes/skills.js";
-import { spendRouter } from "./routes/spend.js";
 import { tenantsRouter } from "./routes/tenants.js";
 import { tokenUsageRouter } from "./routes/token-usage.js";
 
@@ -52,13 +51,12 @@ export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi,
 
   // API routes
   app.use("/api/tenants", tenantsRouter(customApi, prisma));
+  app.use("/api/ai-budget", aiBudgetRouter(coreApi, prisma));
   app.use("/api/skills", skillsRouter(prisma));
   app.use("/api/policies", policiesRouter(customApi, prisma));
   app.use("/api/audit", auditRouter(prisma));
   app.use("/api/metrics", metricsRouter(prisma));
   app.use("/api/token-usage", tokenUsageRouter(prisma));
-  app.use("/api/spend", spendRouter(prisma));
-  app.use("/api/budgets", budgetsRouter(prisma));
   app.use("/api/access-tokens", accessTokensRouter(prisma));
   app.use("/api/providers/keys", providerKeysRouter(prisma));
 

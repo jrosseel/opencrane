@@ -75,6 +75,8 @@ export class TenantLiteLlmKeys
 
     // 3. Provision key in LiteLLM and persist as a namespaced Secret for tenant env injection.
     const budget = tenant.spec.monthlyBudgetUsd ?? this.config.liteLlmDefaultMonthlyBudgetUsd;
+    const issuedAt = new Date().toISOString();
+    const keyAlias = `opencrane-${name}`;
     const apiKey = await this._generateLiteLlmVirtualKey(name, budget);
     const secret: k8s.V1Secret = {
       apiVersion: "v1",
@@ -83,6 +85,11 @@ export class TenantLiteLlmKeys
         name: secretName,
         namespace,
         labels: _BuildTenantLabels(name),
+        annotations: {
+          "opencrane.io/litellm-key-alias": keyAlias,
+          "opencrane.io/litellm-issued-at": issuedAt,
+          "opencrane.io/litellm-monthly-budget-usd": String(budget),
+        },
       },
       type: "Opaque",
       data: {

@@ -24,9 +24,11 @@ export interface StorageProvider
 /**
  * Builds a Crossplane BucketClaim custom resource for a tenant.
  * The Crossplane controller provisions the actual cloud storage bucket.
+ * 
  * @param tenantName - Unique tenant identifier
  * @param namespace - Kubernetes namespace
  * @param bucketPrefix - Prefix for bucket naming (e.g. "opencrane")
+ * 
  * @returns A Kubernetes object representing the BucketClaim CR
  */
 export function _BuildGCPBucketClaim(tenantName: string, namespace: string, bucketPrefix: string): KubernetesObject
@@ -48,4 +50,16 @@ export function _BuildGCPBucketClaim(tenantName: string, namespace: string, buck
       tenantName,
     },
   } as KubernetesObject;
+}
+
+/**
+ * Backwards-compatible bucket claim builder export used by existing callers and tests.
+ * @param tenantName - Unique tenant identifier.
+ * @param namespace - Kubernetes namespace.
+ * @param bucketPrefix - Prefix for bucket naming (e.g. "opencrane").
+ * @returns A Kubernetes object representing the BucketClaim CR.
+ */
+export function buildBucketClaim(tenantName: string, namespace: string, bucketPrefix: string): KubernetesObject
+{
+  return _BuildGCPBucketClaim(tenantName, namespace, bucketPrefix);
 }
