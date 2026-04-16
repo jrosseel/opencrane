@@ -6,6 +6,13 @@ This is an updated roadmap for shipping OpenCrane, the enterprise multi-tenant A
 
 **Current state**: Phase 1 is ~60–70% built. All core operator, API, and UI code exists. Missing: Helm deployment templates, Docker image publishing, and end-to-end integration tests.
 
+**Live update (2026-04-16)**:
+- Phase II cost-control routing refactor is complete and validated.
+- AI budget/spend/key management is consolidated under `/api/ai-budget`.
+- Dedicated AI-budget router tests were added and are passing.
+- Control-plane UI test pipeline is now fixed (Karma/Jasmine deps + spec config + baseline spec).
+- Full workspace validation currently passes: `pnpm test` and `pnpm build`.
+
 **Strategic approach**: OpenCrane differentiates by combining:
 - **Architectural advantages**: GCS Fuse CSI + Workload Identity (cloud-native isolation), dual-write pattern (CRDs + PostgreSQL), policy-first governance (AccessPolicy CRDs → CiliumNetworkPolicy).
 - **Tactical features**: Cost control (LiteLLM), self-service UX (web + Slack), fleet operations (auto-update, metrics, channel management).
@@ -32,7 +39,7 @@ Ship a production-grade multi-tenant OpenClaw platform that is:
 **Operator** (apps/operator/src/)
 - TenantOperator class with full reconcile loop (ServiceAccount, ConfigMap, Deployment, Service, Ingress, encryption key)
 - PolicyOperator watching AccessPolicy CRDs → CiliumNetworkPolicy generation
-- TenantResourceBuilder for K8s resource generation
+- Functional tenant deploy resource builders for K8s resource generation
 - TenantStatusWriter, TenantCleanup helpers
 - IdleChecker for auto-suspend on inactivity
 - Config loading, helpers (TenantDomains)
@@ -40,14 +47,16 @@ Ship a production-grade multi-tenant OpenClaw platform that is:
 
 **Control Plane API** (apps/control-plane/src/)
 - Express server with bearer token auth middleware
-- Full CRUD routes for Tenants, Policies, Skills, Audit, Metrics, Token Usage, Budgets, Access Tokens, Provider Keys
+- Full CRUD routes for Tenants, Policies, Skills, Audit, Metrics, Token Usage, Access Tokens, Provider Keys
+- Consolidated AI budget routes (`/api/ai-budget`) for global/account budgets, tenant spend, and LiteLLM key management
 - Dual-write pattern: K8s CRDs + PostgreSQL via Prisma
-- Prisma schema with 10 tables (Tenant, AccessPolicy, AuditEntry, Skill, ServerMetricSnapshot, etc.)
+- Prisma schema extended with LiteLLM key metadata tracking
 
 **Control Plane UI** (apps/control-plane-ui/src/)
 - Angular 20 app with PrimeNG components
 - Feature pages: stats, token usage, access tokens, provider keys
 - Shared component structure
+- Test tooling now wired and passing (spec config + baseline component spec)
 
 **Infrastructure & CRDs**
 - Helm chart skeleton with values (operator, control-plane, tenant defaults, network policy)
